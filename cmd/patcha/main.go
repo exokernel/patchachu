@@ -5,6 +5,6 @@ import (
 )
 
 func main() {
-	pdb = patchachu.New()
-	pdb.build()
+	pdb := patchachu.NewPatchastore()
+	pdb.Init()
 }
