@@ -97,7 +97,7 @@ type Patchastore struct {
 	store DataStore
 }
 
-func NewPatchstore() *Patchastore {
+func NewPatchastore() *Patchastore {
 	return &Patchastore{
 		store: nil,
 	}
