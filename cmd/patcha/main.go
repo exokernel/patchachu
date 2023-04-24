@@ -1,3 +1,5 @@
+package main
+
 import (
 	"github.com/exokernel/patchachu/patchachu"
 )
