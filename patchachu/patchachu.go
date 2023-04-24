@@ -91,3 +91,18 @@ type SQLiteDataStore struct {
 	// warn the user it's old data and prompt for rebuild
 	//expiresAt time
 }
+
+type Patchastore struct {
+	// The datastore
+	store DataStore
+}
+
+func (pdb *Patchastore) New() *Patchastore {
+	return &Patchastore{
+		store: nil,
+	}
+}
+
+func (pdb *Patchastore) Init() {
+	println("Patcha! Initializing the Patchastore!")
+}
