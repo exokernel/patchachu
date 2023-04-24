@@ -1,3 +1,3 @@
-module github.com/exokernel/patchachu/patchachu
+module github.com/exokernel/patchachu
 
 go 1.19
