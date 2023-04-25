@@ -72,8 +72,11 @@ func NewPatchastore() *Patchastore {
 // Do the API calls to get the data into instances and deployments
 func (pdb *Patchastore) fetch() error {
 	// Get the all the deployments and then all the instances
+	// These API calls could be done concurrently
 	pdb.fetchDeployments()
 	pdb.fetchInstances()
+
+	// Now we link the instances and deployments together by making them reference each other
 	// For each deployment, get the instances covered by the deployment
 	for _, deployment := range pdb.deployments {
 		instances := deployment.fetchInstances()
@@ -115,22 +118,45 @@ func (pdb *Patchastore) fetchInstances() error {
 	return nil
 }
 
-// Populate the datastore if necessary
-func (pdb *Patchastore) Populate() error {
+// What?
+// Populate the in-memory cache and build the persistent datastore if necessary
+// Else build the in-memory cache from the datastore
+//
+// Why?
+// This is the heavy lifting necessary to get patchachu ready to answer queries from its in-memory cache and persist that data
+// to disk so that it doesn't have to be fetched from GCP on subsequent runs (at least until the data expires)
+// It's a one-time cost that is paid in full before the first query
+//
+// Reasoning:
+// We want to avoid making API calls if possible, because they're slow, hence the persistent datastore
+// We want to use the in-memory cache if possible, because it's faster than queyring the datastore
+//
+// If the datastore is empty or expired our strategy is to do the API calls once building our cache as we go and then
+// save the cached data in the persistent datastore. We don't need to do the API calls again until the data in the datastore expires.
+//
+// If the datastore is not empty and has not expired, we can use the data in the datastore to build our in-memory cache.
+//
+// TODO: Error handling
+func (pdb *Patchastore) Populate() {
 	// If the datastore is not empty and has expired, clear it and reset the expiration time
 	if !pdb.store.IsEmpty() && pdb.store.IsExpired() {
 		pdb.store.Clear()
 		pdb.store.setExpiresAt(time.Now().Add(24 * time.Hour))
 	}
 	// If the datastore is empty and has not expired, populate it
-	if pdb.store.IsEmpty() && !pdb.store.IsExpired() {
-		// Fetch the data
+	if !pdb.store.IsEmpty() && pdb.store.IsExpired() {
+		// Fetch the data with API calls and build the in-memory cache from the fetched data
 		pdb.fetch()
 
-		// Build the datastore from instances and deployments
+		// Build the datastore from memory-cached instances and deployments
 		pdb.store.Build(pdb.instances, pdb.deployments)
+	} else if !pdb.store.IsEmpty() && !pdb.store.IsExpired() {
+		// Great news everyone! We can use the locally stored data!
+		// The datastore is not empty and has not expired, so we need to build our in-memory cache from the datastore
+		//pdb.instances, pdb.deployments = pdb.store.InstancesAndDeployments()
+		println("TODO: Build the in-memory cache from the datastore")
 	}
-	return nil
+	// we don't need to do anything if the datastore is empty and has expired
 }
 
 func (pdb *Patchastore) Init(config *Config) {
