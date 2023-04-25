@@ -1,63 +1,47 @@
 package patchachu
 
-type Instance struct {
-	Name string
-	//IP          IpAddress
-	Tags        []string
-	Project     string
-	Region      string
-	Zone        string
-	Deployments []Deployment
-}
-
-// A GCP patch deployment
-type Deployment struct {
-	Name string
-	//Filters   []Filter
-	Project   string
-	Instances []Instance
-}
+import "time"
 
 // An interface for a datastore
 // The concrete implementation of this interface could be SQLite, flat file, etc.
 type DataStore interface {
 	// Check if the data is empty
-	isEmpty() bool
+	IsEmpty() bool
 
 	// Seed the data
 	// After this call the datastore should be ready to answer queries
 	// and isEmpty() should return false
-	build(instances []Instance, deployments []Deployment) error
+	Build(instances []Instance, deployments []Deployment) error
 
 	// Clear the data
 	// After this call the datastore should be empty and isEmpty() should return true
-	clear() error
+	Clear() error
 
 	// Get all the instances that are covered by the deployment
 	// Note that if a deployment has no instances it means that the filters aren't
 	// matching any instances. This is is not ideal and should be fixed.
-	instancesForDeployment(deployment Deployment) []Instance
+	InstancesForDeployment(deployment Deployment) []Instance
 
 	// Get all the deployments whose filters match the instance
 	// Note that if an instance is covered by multiple deployments it generally
 	// means that we have two different deployments that are overlapping, which is
 	// not ideal.
-	deploymentsForInstance(instance Instance) []Deployment
+	DeploymentsForInstance(instance Instance) []Deployment
 
 	// Get all the instances that have no deployments
-	instancesWithNoDeployments() []Instance
+	InstancesWithNoDeployments() []Instance
 
 	// Get all the deployments that have no instances
-	deploymentsWithNoInstances() []Deployment
+	DeploymentsWithNoInstances() []Deployment
 
 	// Set the expiration time
-	//setExpiresAt(time time)
+	setExpiresAt(time time.Time)
 
 	// Get the time the data expires
 	//expiresAt() time
 
 	// Check if the data is expired
-	isExpired() bool
+	IsExpired() bool
 
 	// Generate a report in CSV format to the given file
 	// The file will be created if it doesn't exist
@@ -70,31 +54,12 @@ type DataStore interface {
 	//jsonReport(reportFile File) error
 }
 
-// An SQLite datastore that implements the DataStore interface
-type SQLiteDataStore struct {
-
-	// The path to the SQLite db file on disk
-	//db File
-	// The path to the SQLite WAL file
-	//wal File
-
-	// In memory caches can be used to speed lookups/reporting and refreshed on demand
-	// Could have separate Cache structure/interface that multiple DataStores can use since
-	// they all use deployments and instances.
-
-	// Cache of the deployments
-	deployments []Deployment
-	// Cache of the instances
-	instances []Instance
-
-	// DataStore has an expiration so we can automatically rebuild or
-	// warn the user it's old data and prompt for rebuild
-	//expiresAt time
-}
-
 type Patchastore struct {
 	// The datastore
 	store DataStore
+
+	instances   []Instance
+	deployments []Deployment
 }
 
 // Create a new Patchastore
@@ -104,6 +69,78 @@ func NewPatchastore() *Patchastore {
 	}
 }
 
-func (pdb *Patchastore) Init() {
+// Do the API calls to get the data into instances and deployments
+func (pdb *Patchastore) fetch() error {
+	// Get the all the deployments and then all the instances
+	pdb.fetchDeployments()
+	pdb.fetchInstances()
+	// For each deployment, get the instances covered by the deployment
+	for _, deployment := range pdb.deployments {
+		instances := deployment.fetchInstances()
+		for _, instance := range instances {
+			// if this instance is already in the list of instances, add a pointer to it to the deployment
+			// if this instance is not in the list of instances, add it to the list and add a pointer to it to the deployment
+			// also it's very strange to find an instance not already in the list of all instances so we should log that
+			if !instanceInList(instance, pdb.instances) {
+				pdb.instances = append(pdb.instances, instance)
+				deployment.Instances = append(deployment.Instances, instance)
+				// log that we found an instance not already in the list of all instances
+				println("Found an instance not already in the list of all instances: %v", instance.Name)
+			} else {
+				// add a pointer to the instance to the deployment's list of instances
+				deployment.Instances = append(deployment.Instances, instance)
+			}
+		}
+	}
+	return nil
+}
+
+func instanceInList(instance Instance, list []Instance) bool {
+	for _, i := range list {
+		if i.Name == instance.Name {
+			return true
+		}
+	}
+	return false
+}
+
+// Do the API calls to get the deployment data
+func (pdb *Patchastore) fetchDeployments() error {
+	pdb.deployments = []Deployment{}
+	return nil
+}
+
+func (pdb *Patchastore) fetchInstances() error {
+	pdb.instances = []Instance{}
+	return nil
+}
+
+// Populate the datastore if necessary
+func (pdb *Patchastore) Populate() error {
+	// If the datastore is not empty and has expired, clear it and reset the expiration time
+	if !pdb.store.IsEmpty() && pdb.store.IsExpired() {
+		pdb.store.Clear()
+		pdb.store.setExpiresAt(time.Now().Add(24 * time.Hour))
+	}
+	// If the datastore is empty and has not expired, populate it
+	if pdb.store.IsEmpty() && !pdb.store.IsExpired() {
+		// Fetch the data
+		pdb.fetch()
+
+		// Build the datastore from instances and deployments
+		pdb.store.Build(pdb.instances, pdb.deployments)
+	}
+	return nil
+}
+
+func (pdb *Patchastore) Init(config *Config) {
 	println("Patcha! Initializing the Patchastore!")
+
+	if config.StoreType == "sqlite" {
+		pdb.store = NewSQLiteDataStore()
+	}
+}
+
+func (pdb *Patchastore) InstancesWithNoDeployments() []Instance {
+	return nil
 }
