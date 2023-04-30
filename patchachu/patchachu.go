@@ -13,9 +13,14 @@ type DataStore interface {
 	// and isEmpty() should return false
 	Build(instances []Instance, deployments []Deployment) error
 
-	// Clear the data
+	// Clear the data e.g. drop all tables in sqlite
 	// After this call the datastore should be empty and isEmpty() should return true
 	Clear() error
+
+	// Completely destroy the underlying datastore e.g. rm sqlite db file
+	// It's good to clean up after ourselves
+	// After this call the datastore should be empty and isEmpty() should return true
+	//Destroy() error
 
 	// Get all the instances that are covered by the deployment
 	// Note that if a deployment has no instances it means that the filters aren't

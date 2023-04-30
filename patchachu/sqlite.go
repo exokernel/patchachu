@@ -1,27 +1,15 @@
 package patchachu
 
-import "time"
+import (
+	"os"
+	"time"
+)
 
 // An SQLite datastore that implements the DataStore interface
 type SQLiteDataStore struct {
 
 	// The path to the SQLite db file on disk
-	//db File
-	// The path to the SQLite WAL file
-	//wal File
-
-	// In memory caches can be used to speed lookups/reporting and refreshed on demand
-	// Could have separate Cache structure/interface that multiple DataStores can use since
-	// they all use deployments and instances.
-
-	// Cache of the deployments
-	deployments []Deployment
-	// Cache of the instances
-	instances []Instance
-
-	// DataStore has an expiration so we can automatically rebuild or
-	// warn the user it's old data and prompt for rebuild
-	//expiresAt time
+	db os.File
 }
 
 func NewSQLiteDataStore() *SQLiteDataStore {
