@@ -1,6 +1,12 @@
 package patchachu
 
-import "time"
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"google.golang.org/api/osconfig/v1"
+)
 
 // An interface for a datastore
 // The concrete implementation of this interface could be SQLite, flat file, etc.
@@ -113,8 +119,21 @@ func instanceInList(instance Instance, list []Instance) bool {
 }
 
 // Do the API calls to get the deployment data
-func (pdb *Patchastore) fetchDeployments() error {
+func (pdb *Patchastore) fetchDeployments(project string) error {
 	pdb.deployments = []Deployment{}
+	ctx := context.Background()
+	osconfigService, err := osconfig.NewService(ctx)
+	if err != nil {
+		fmt.Printf("Failed to create OSConfig service: %v", err)
+		return err
+	}
+	//project := "projects/" + os.Getenv("GOOGLE_CLOUD_PROJECT")
+	listResponse, err := osconfig.NewProjectsPatchDeploymentsService(osconfigService).List(project).Do()
+	if err != nil {
+		fmt.Printf("Failed to list patch deployments: %v", err)
+		return err
+	}
+
 	return nil
 }
 
