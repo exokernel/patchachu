@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"google.golang.org/api/osconfig/v1"
+	osconfig "cloud.google.com/go/osconfig/apiv1"
+	osconfigpb "cloud.google.com/go/osconfig/apiv1/osconfigpb"
+	"google.golang.org/api/iterator"
 )
 
 // An interface for a datastore
@@ -119,19 +121,47 @@ func instanceInList(instance Instance, list []Instance) bool {
 }
 
 // Do the API calls to get the deployment data
+// https://github.com/googleapis/google-cloud-go/wiki/Iterator-Guidelines
+// https://pkg.go.dev/cloud.google.com/go/osconfig@v1.11.1/apiv1#Client.ListPatchDeployments
+// TODO: fully convert osconfigpb.PatchDeployment to Deployment and append to pdb.deployments
 func (pdb *Patchastore) fetchDeployments(project string) error {
-	pdb.deployments = []Deployment{}
 	ctx := context.Background()
-	osconfigService, err := osconfig.NewService(ctx)
+
+	// Create a new client.
+	c, err := osconfig.NewClient(ctx)
 	if err != nil {
-		fmt.Printf("Failed to create OSConfig service: %v", err)
+		fmt.Printf("Failed to create client: %v", err)
 		return err
 	}
-	//project := "projects/" + os.Getenv("GOOGLE_CLOUD_PROJECT")
-	listResponse, err := osconfig.NewProjectsPatchDeploymentsService(osconfigService).List(project).Do()
-	if err != nil {
-		fmt.Printf("Failed to list patch deployments: %v", err)
-		return err
+	defer c.Close()
+
+	// Create the initial request to list patch deployments.
+	req := &osconfigpb.ListPatchDeploymentsRequest{
+		Parent: project,
+	}
+
+	// Iterate over all paginated results.
+	it := c.ListPatchDeployments(ctx, req)
+	p := iterator.NewPager(it, 50, "")
+	for {
+		var deployments []*osconfigpb.PatchDeployment
+		nextPageToken, err := p.NextPage(&deployments)
+		if err != nil {
+			fmt.Printf("Failed to get patch deployments: %v", err)
+			return err
+		}
+		for _, deployment := range deployments {
+			fmt.Printf("Deployment: %v\n", deployment.GetName())
+			// new deployment from osconfigpb.PatchDeployment
+			pdbDeployment := Deployment{
+				Name: deployment.GetName(),
+			}
+			// append to pdb.deployments
+			pdb.deployments = append(pdb.deployments, pdbDeployment)
+		}
+		if nextPageToken == "" {
+			break
+		}
 	}
 
 	return nil
