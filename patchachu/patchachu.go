@@ -69,7 +69,8 @@ type DataStore interface {
 
 type Patchastore struct {
 	// The datastore
-	store DataStore
+	store  DataStore
+	config *Config
 
 	instances   []Instance
 	deployments []Deployment
@@ -83,11 +84,11 @@ func NewPatchastore() *Patchastore {
 }
 
 // Do the API calls to get the data into instances and deployments
-func (pdb *Patchastore) fetch() error {
+func (pdb *Patchastore) fetch(project string) error {
 	// Get the all the deployments and then all the instances
 	// These API calls could be done concurrently
-	pdb.fetchDeployments()
-	pdb.fetchInstances()
+	pdb.fetchDeployments(project)
+	pdb.fetchInstances(project)
 
 	// Now we link the instances and deployments together by making them reference each other
 	// For each deployment, get the instances covered by the deployment
@@ -142,7 +143,7 @@ func (pdb *Patchastore) fetchDeployments(project string) error {
 
 	// Iterate over all paginated results.
 	it := c.ListPatchDeployments(ctx, req)
-	p := iterator.NewPager(it, 50, "")
+	p := iterator.NewPager(it, 50, "") // TODO: make page size configurable
 	for {
 		var deployments []*osconfigpb.PatchDeployment
 		nextPageToken, err := p.NextPage(&deployments)
@@ -167,7 +168,7 @@ func (pdb *Patchastore) fetchDeployments(project string) error {
 	return nil
 }
 
-func (pdb *Patchastore) fetchInstances() error {
+func (pdb *Patchastore) fetchInstances(project string) error {
 	pdb.instances = []Instance{}
 	return nil
 }
@@ -200,7 +201,9 @@ func (pdb *Patchastore) Populate() {
 	// If the datastore is empty and has not expired, populate it
 	if !pdb.store.IsEmpty() && pdb.store.IsExpired() {
 		// Fetch the data with API calls and build the in-memory cache from the fetched data
-		pdb.fetch()
+		for _, project := range pdb.config.Projects {
+			pdb.fetch(project)
+		}
 
 		// Build the datastore from memory-cached instances and deployments
 		pdb.store.Build(pdb.instances, pdb.deployments)
@@ -215,6 +218,7 @@ func (pdb *Patchastore) Populate() {
 
 func (pdb *Patchastore) Init(config *Config) {
 	println("Patcha! Initializing the Patchastore!")
+	pdb.config = config
 
 	if config.StoreType == "sqlite" {
 		pdb.store = NewSQLiteDataStore()
