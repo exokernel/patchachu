@@ -195,11 +195,13 @@ func (pdb *Patchastore) fetchInstances(project string) error {
 func (pdb *Patchastore) Populate() {
 	// If the datastore is not empty and has expired, clear it and reset the expiration time
 	if !pdb.store.IsEmpty() && pdb.store.IsExpired() {
+		println("Datastore is not empty and has expired, clearing it and resetting the expiration time")
 		pdb.store.Clear()
 		pdb.store.setExpiresAt(time.Now().Add(24 * time.Hour))
 	}
 	// If the datastore is empty and has not expired, populate it
 	if !pdb.store.IsEmpty() && pdb.store.IsExpired() {
+		println("Datastore is empty and has not expired, populating it")
 		// Fetch the data with API calls and build the in-memory cache from the fetched data
 		for _, project := range pdb.config.Projects {
 			pdb.fetch(project)
@@ -214,6 +216,7 @@ func (pdb *Patchastore) Populate() {
 		println("TODO: Build the in-memory cache from the datastore")
 	}
 	// we don't need to do anything if the datastore is empty and has expired
+	println("nothing to do")
 }
 
 func (pdb *Patchastore) Init(config *Config) {

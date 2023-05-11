@@ -8,7 +8,8 @@ func main() {
 	pdb := patchachu.NewPatchastore()
 	pdb.Init(&patchachu.Config{
 		StoreType: "sqlite",
-		Projects:  []string{"integration", "staging", "production"}, // TODO: Make this a command line argument
+		//Projects:  []string{"integration", "staging", "production"}, // TODO: Make this a command line argument
+		Projects: []string{"integration"}, // testing
 	})
 
 	// Populate the datastore with patch info from each project
