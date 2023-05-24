@@ -148,11 +148,11 @@ func (pdb *Patchastore) fetchDeployments(project string) error {
 		var deployments []*osconfigpb.PatchDeployment
 		nextPageToken, err := p.NextPage(&deployments)
 		if err != nil {
-			fmt.Printf("Failed to get patch deployments: %v", err)
+			fmt.Println("Failed to get patch deployments:", err)
 			return err
 		}
 		for _, deployment := range deployments {
-			fmt.Printf("Deployment: %v\n", deployment.GetName())
+			fmt.Println("Deployment:", deployment.GetName())
 			// new deployment from osconfigpb.PatchDeployment
 			pdbDeployment := Deployment{
 				Name: deployment.GetName(),
